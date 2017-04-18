@@ -6,9 +6,13 @@ let package = Package(
     name: "Asteroids",
     targets: [
       Target(name: "muse"),
-      Target(name: "Asteroids", dependencies: ["muse"])
+      Target(name: "Asteroids", dependencies: [.Target(name: "muse")]),
+      Target(name: "LoopStatic", dependencies: [.Target(name: "Asteroids")]),
+      Target(name: "LoopDynamic"),
     ]
 )
 
-let lib = Product(name: "muse", type: .Library(.Dynamic), modules: "muse")
+let libAsteroids = Product(name: "Asteroids", type: .Library(.Dynamic), modules: "Asteroids")
+
+products.append(libAsteroids)
 
