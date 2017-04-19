@@ -36,6 +36,7 @@ public final class DynamicLib {
         guard dlopen_preflight(path) else {
             fatalError(dlError)
         }
+
         handle = dlopen(path, RTLD_LAZY)
 
         guard handle != nil else {
@@ -49,6 +50,7 @@ public final class DynamicLib {
         guard let handle = handle else {
             fatalError(dlError)
         }
+
         guard dlclose(handle) == 0 else {
             fatalError(dlError)
         }

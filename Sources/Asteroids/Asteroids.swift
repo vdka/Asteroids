@@ -65,6 +65,7 @@ extension Color: ExpressibleByIntegerLiteral {
 
     static var white: Color = 0xffffffff
     static var black: Color = 0x000000ff
+    static var red:   Color = 0xff0000ff
     static var green: Color = 0x00ff00ff
     static var blue:  Color = 0x0000ffff
 }
@@ -125,7 +126,6 @@ public func update(_ memory: UnsafeMutableRawPointer) {
         return
     }
 
-
     if IsKeyDown(KeyD) { gameState.camera.x += 1 * Float(frameTime) }
     if IsKeyDown(KeyA) { gameState.camera.x -= 1 * Float(frameTime) }
     if IsKeyDown(KeyW) { gameState.camera.y += 1 * Float(frameTime) }
@@ -145,20 +145,24 @@ public func update(_ memory: UnsafeMutableRawPointer) {
     BeginFrame()
     ClearBackground(.white)
 
-    //    FillTriXY(0, 0, 0, 0.5, 0.25, 0.25, 0xff0000ff)
-    //    FillTriXY(0, 0, 0.25, 0.25, 0.5, 0, 0x00ff00ff)
-    //    FillTriXY(0.5, 0, 0.5, 0.5, 0, 0.5, 0x0000ffff)
+    print("ASDFASDF")
+
+//    FillTriXY(0, 0, 0, 0.5, 0.25, 0.25, .red)
+//    FillTriXY(0, 0, 0.25, 0.25, 0.5, 0, .green)
+//    FillTriXY(0.5, 0, 0.5, 0.5, 0, 0.5, .blue)
 
     FillQuadCentered(V2(x: 0.5, y: 0.75), V2(x: 0.05, y: 0.5),   .black)
     FillQuadCentered(V2(x: -0.5, y: -0.75), V2(x: 0.05, y: 0.5), .black)
     FillQuadCentered(V2(x: 0.5, y: -0.75), V2(x: 0.05, y: 0.5),  .black)
     FillQuadCentered(V2(x: -0.5, y: 0.75), V2(x: 0.05, y: 0.5),  .black)
-    DrawLine(0, 0, endRay.x, endRay.y, 0x0000ffff)
+    DrawLine(0, 0, endRay.x, endRay.y, .red)
 
     //    FillQuadCentered(V2(x: -0.5, y: 0.75), V2(x: 0.1, y: 0.5), .black)
     //    DrawLine(0.5, 0.5, 0.5, 1.1, .black)
 
-    FillCircle(mouse, 0.05, 0x0000ffff)
+    FillCircle(mouse, 0.05, .blue)
+
+    FillPoly(V2(x: 0.5, y: 1), 6, 0.25, .green)
 
     EndFrame()
 }

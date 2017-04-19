@@ -434,7 +434,7 @@ V2 mousePosition;
 f64 currentTime, previousTime;    // Used to track timmings
 f64 updateTime, drawTime;         // Time measures for update and draw
 f64 frameTime;                    // Time measure for one frame
-f64 targetTime = 0.0;             // Desired time for one frame, if 0 not applied
+f64 targetTime = 1.f / 60.f;      // Desired time for one frame, if 0 not applied
 
 i32 exitKey = GLFW_KEY_ESCAPE;
 
@@ -1275,6 +1275,8 @@ DEF void BeginFrame(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
+#include <unistd.h>
+
 DEF void EndFrame(void) {
     BufferUpdateDefaults();
     BufferDrawDefaults();
@@ -1282,7 +1284,7 @@ DEF void EndFrame(void) {
     glfwSwapBuffers(window);
     glfwPollEvents();
 
-    // Frame time constrol system
+    // Frame time control system
     currentTime = GetTime();
     drawTime = currentTime - previousTime;
     previousTime = currentTime;
@@ -1292,6 +1294,8 @@ DEF void EndFrame(void) {
     f64 extraTime = 0.0;
 
     while (frameTime < targetTime) {
+        usleep((targetTime - frameTime) * 1000.f);
+
         currentTime = GetTime();
         extraTime = currentTime - previousTime;
         previousTime = currentTime;

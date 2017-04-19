@@ -5,41 +5,76 @@ let baseDir = "/" + Array(#file.characters.split(separator: "/").dropLast(3)).ma
 let buildDir = baseDir
 
 
-let gameEngine = DynamicLib(path: buildDir + "/bin/libAsteroids.dylib")
-gameEngine.load()
+let coreDylib     = DynamicLib(path: buildDir + "/bin/libAsteroids.dylib")
+let coreFramework = DynamicLib(path: buildDir + "/bin/Asteroids.framework/Asteroids")
 
-var shouldQuit = false
+var currentCore: DynamicLib
+switch (coreDylib.lastWriteTime, coreFramework.lastWriteTime) {
+case let (dylib?, framework?) where dylib >= framework:
+    currentCore = coreDylib
 
-typealias Byte = UInt8
+case let (dylib?, framework?) where dylib < framework:
+    currentCore = coreFramework
+
+case (_?, _):
+    currentCore = coreDylib
+
+case (_, _?):
+    currentCore = coreFramework
+
+case (_, _):
+    fatalError("No code to load")
+}
+
+currentCore.load()
 
 // If return nil there was an error during initialization
-typealias LoadFunction   = @convention(c) () -> UnsafeMutablePointer<Byte>?
-typealias OnLoadFunction = @convention(c) (UnsafeMutablePointer<Byte>?) -> Void
-typealias UpdateFunction = @convention(c) (UnsafeMutablePointer<Byte>?) -> Bool
+typealias LoadFunction   = @convention(c) () -> UnsafeMutableRawPointer?
+typealias OnLoadFunction = @convention(c) (UnsafeMutableRawPointer) -> Void
+typealias UpdateFunction = @convention(c) (UnsafeMutableRawPointer) -> Void
 
-let setup = gameEngine.unsafeSymbol(named: "setup", withSignature: LoadFunction.self)
+let setup = currentCore.unsafeSymbol(named: "setup", withSignature: LoadFunction.self)
 
 var memory = setup?()
 
-guard memory != nil else { fatalError("Call to initialize function failed") }
+guard var memory = memory else { fatalError("Call to initialize function failed") }
 
-while (!shouldQuit) {
+while !memory.assumingMemoryBound(to: Bool.self).pointee {
 
-  if gameEngine.shouldReload {
+    if currentCore.shouldReload {
 
-    gameEngine.reload()
+        currentCore.reload()
 
-    let onLoad = gameEngine.unsafeSymbol(named: "onLoad", withSignature: OnLoadFunction.self)
+        let onLoad = currentCore.unsafeSymbol(named: "onLoad", withSignature: OnLoadFunction.self)
 
-    onLoad?(memory)
-  }
+        onLoad?(memory)
+    }
 
-  guard let loop = gameEngine.symbol(named: "update") else {
-    print("update function missing")
-    continue
-  }
+    guard let loop = currentCore.symbol(named: "update") else {
+        print("update function missing")
+        continue
+    }
 
-  shouldQuit = unsafeBitCast(loop, to: UpdateFunction.self)(memory)
+    unsafeBitCast(loop, to: UpdateFunction.self)(memory)
+
+    //
+    // Set to most recently update lib
+    switch (coreDylib.lastWriteTime, coreFramework.lastWriteTime) {
+    case let (dylib?, framework?) where dylib >= framework:
+        currentCore = coreDylib
+
+    case let (dylib?, framework?) where dylib < framework:
+        currentCore = coreFramework
+
+    case (_?, _):
+        currentCore = coreDylib
+
+    case (_, _?):
+        currentCore = coreFramework
+        
+    case (_, _):
+        fatalError("No code to load")
+    }
 }
 
 print("Did quit cleanly!")
