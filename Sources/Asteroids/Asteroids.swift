@@ -53,35 +53,12 @@ func raycast(from rayStart: V2, to rayEnd: V2, _ seg1: V2, seg2: V2) -> V2 {
     return collision
 }
 
-extension Color: ExpressibleByIntegerLiteral {
-
-    public init(integerLiteral value: UInt32) {
-        self = unsafeBitCast(value.bigEndian, to: Color.self)
-    }
-
-    public init(rgba: UInt32) {
-        self.rgba = rgba.bigEndian
-    }
-
-    static var white: Color = 0xffffffff
-    static var black: Color = 0x000000ff
-    static var red:   Color = 0xff0000ff
-    static var green: Color = 0x00ff00ff
-    static var blue:  Color = 0x0000ffff
-}
-
-extension V2: CustomStringConvertible {
-    static let zero = V2(x: 0, y: 0)
-
-    public var description: String {
-        return "(\(x), \(y))"
-    }
-}
-
 struct GameState {
     var currStateSize: Int
     var camera: Camera
     var museState: OpaquePointer
+
+    var entities: [Entity] = []
 
     init(camera: Camera) {
         self.currStateSize = MemoryLayout<GameState>.size
@@ -109,9 +86,12 @@ func setup() -> UnsafeMutablePointer<GameState> {
     InitWindow(640, 480, "Asteroids")
 
     let camera = Camera(x: 0, y: 0, width: 3.2, height: 2.4)
-    let gameState = GameState(camera: camera)
+    var gameState = GameState(camera: camera)
 
     SetCamera(camera)
+
+    let player = Entity(kind: EntityKindPlayer, position: .zero, velocity: .zero, direction: 0)
+    gameState.entities.append(player)
 
     let memory = UnsafeMutablePointer<GameState>.allocate(capacity: 1)
     memory.pointee = gameState
@@ -136,11 +116,29 @@ func update(_ memory: UnsafeMutablePointer<GameState>) {
         return
     }
 
-    if IsKeyDown(KeyD) { gameState.camera.x += 1 * Float(GetFrameTime()) }
-    if IsKeyDown(KeyA) { gameState.camera.x -= 1 * Float(GetFrameTime()) }
-    if IsKeyDown(KeyW) { gameState.camera.y += 1 * Float(GetFrameTime()) }
-    if IsKeyDown(KeyS) { gameState.camera.y -= 1 * Float(GetFrameTime()) }
+    var player = gameState.entities[0]
+    if IsKeyDown(KeyD) {
+        gameState.camera.x += 1 * Float(GetFrameTime())
+        player.direction -= 0.1
+    }
+    if IsKeyDown(KeyA) {
 
+        player.direction += 0.1
+        gameState.camera.x -= 1 * Float(GetFrameTime())
+    }
+    if IsKeyDown(KeyW) {
+        gameState.camera.y += 1 * Float(GetFrameTime())
+
+        let flame = Entity(kind: EntityKindExhaust, position: player.position, velocity: player.velocity, direction: player.direction)
+        gameState.entities.append(flame)
+    }
+    if IsKeyDown(KeyS) {
+        gameState.camera.y -= 1 * Float(GetFrameTime())
+    }
+
+
+    gameState.camera.width  = 320
+    gameState.camera.height = 240
     SetCamera(gameState.camera)
 
     let mouse = WorldToCamera(GetMousePosition())
@@ -150,28 +148,13 @@ func update(_ memory: UnsafeMutablePointer<GameState>) {
     }
     // TODO(vdka): Zoom
 
-    let endRay = raycast(from: V2.zero, to: mouse, V2(x: 0.5, y: 0.5), seg2: V2(x: 0.5, y: 1))
-
     BeginFrame()
-    ClearBackground(.white)
+    ClearBackground(.black)
 
+    for entity in gameState.entities {
 
-//    FillTriXY(0, 0, 0, 0.5, 0.25, 0.25, .red)
-//    FillTriXY(0, 0, 0.25, 0.25, 0.5, 0, .green)
-//    FillTriXY(0.5, 0, 0.5, 0.5, 0, 0.5, .blue)
-
-    FillQuadCentered(V2(x: 0.5, y: 0.75), V2(x: 0.05, y: 0.5),   .black)
-    FillQuadCentered(V2(x: -0.5, y: -0.75), V2(x: 0.05, y: 0.5), .black)
-    FillQuadCentered(V2(x: 0.5, y: -0.75), V2(x: 0.05, y: 0.5),  .black)
-    FillQuadCentered(V2(x: -0.5, y: 0.75), V2(x: 0.05, y: 0.5),  .black)
-    DrawLine(0, 0, endRay.x, endRay.y, .red)
-
-    //    FillQuadCentered(V2(x: -0.5, y: 0.75), V2(x: 0.1, y: 0.5), .black)
-    //    DrawLine(0.5, 0.5, 0.5, 1.1, .black)
-
-    FillCircle(mouse, 0.05, .green)
-
-    FillPoly(V2(x: 0.5, y: 1), 6, 0.25, .blue)
+        draw(entity)
+    }
 
     EndFrame()
 }

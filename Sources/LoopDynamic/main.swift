@@ -1,9 +1,4 @@
 
-
-let baseDir = "/" + Array(#file.characters.split(separator: "/").dropLast(3)).map(String.init).joined(separator: "/")
-
-let buildDir = baseDir
-
 let lib = DynamicLib(path: "@executable_path/Asteroids")
 lib.load()
 

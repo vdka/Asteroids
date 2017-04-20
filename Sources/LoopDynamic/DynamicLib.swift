@@ -10,9 +10,26 @@ func curTime() -> Double {
     return Double(tv.tv_sec) + Double(tv.tv_usec) / 1000000
 }
 
-// TODO(vdka): Get the current executing file directory using Dl_info for use as executablePath
+// Just used for an address.
+var variable: Bool = false
 
-let executablePath = "/" + Array(CommandLine.arguments.first!.characters.split(separator: "/").dropLast()).map(String.init).joined(separator: "/")
+// TODO(vdka): Get the current executing file directory using Dl_info for use as executablePath
+func getExecutablePath() -> String {
+    var info = dl_info()
+
+    // First get the address of _main
+
+    withUnsafePointer(to: &variable) {
+
+        guard dladdr($0, &info) != 0 else {
+            fatalError("Failed to get self")
+        }
+    }
+
+    let path = String(cString: info.dli_fname)
+
+    return "/" + Array(path.characters.split(separator: "/").dropLast()).map(String.init).joined(separator: "/")
+}
 
 public final class DynamicLib {
 
@@ -28,6 +45,8 @@ public final class DynamicLib {
     }
 
     public init(path: String) {
+
+        let executablePath = getExecutablePath()
 
         self.path = path.replacingOccurrences(of: "@executable_path", with: executablePath)
     }
