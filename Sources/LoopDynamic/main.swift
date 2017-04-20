@@ -4,77 +4,56 @@ let baseDir = "/" + Array(#file.characters.split(separator: "/").dropLast(3)).ma
 
 let buildDir = baseDir
 
-
-let coreDylib     = DynamicLib(path: buildDir + "/bin/libAsteroids.dylib")
-let coreFramework = DynamicLib(path: buildDir + "/bin/Asteroids.framework/Asteroids")
-
-var currentCore: DynamicLib
-switch (coreDylib.lastWriteTime, coreFramework.lastWriteTime) {
-case let (dylib?, framework?) where dylib >= framework:
-    currentCore = coreDylib
-
-case let (dylib?, framework?) where dylib < framework:
-    currentCore = coreFramework
-
-case (_?, _):
-    currentCore = coreDylib
-
-case (_, _?):
-    currentCore = coreFramework
-
-case (_, _):
-    fatalError("No code to load")
-}
-
-currentCore.load()
+let lib = DynamicLib(path: buildDir + "/bin/Asteroids")
+lib.load()
 
 // If return nil there was an error during initialization
 typealias LoadFunction   = @convention(c) () -> UnsafeMutableRawPointer?
-typealias OnLoadFunction = @convention(c) (UnsafeMutableRawPointer) -> Void
 typealias UpdateFunction = @convention(c) (UnsafeMutableRawPointer) -> Void
 
-let setup = currentCore.unsafeSymbol(named: "setup", withSignature: LoadFunction.self)
+let setup = lib.unsafeSymbol(named: "setup", withSignature: LoadFunction.self)
 
 var memory = setup?()
 
 guard var memory = memory else { fatalError("Call to initialize function failed") }
 
-while !memory.assumingMemoryBound(to: Bool.self).pointee {
+//
+// The start of the persisted memory must be the an Int representing the size of the currently
+//   persisted memory. If the size is 0 then it's the lib indicating it is done.
+//
+while memory.assumingMemoryBound(to: Int.self).pointee != 0 {
 
-    if currentCore.shouldReload {
+    let size = memory.assumingMemoryBound(to: Int.self).pointee
 
-        currentCore.reload()
+    if lib.shouldReload {
 
-        let onLoad = currentCore.unsafeSymbol(named: "onLoad", withSignature: OnLoadFunction.self)
+        typealias PreFunction  = @convention(c) (UnsafeMutableRawPointer) -> Void
+        typealias PostFunction = @convention(c) (UnsafeMutableRawPointer) -> Void
 
-        onLoad?(memory)
+        //
+        // Notify the dylib that it is about to be unloaded allowing it to update the persisted memory
+        //
+        let pre = lib.unsafeSymbol(named: "preReload", withSignature: PreFunction.self)
+        pre?(memory)
+
+        //
+        // Unload then reload the code
+        //
+        lib.reload()
+
+        //
+        // Notify the dylib that it has just be reloaded allowing it to reset global state using the persisted memory
+        //
+        let post = lib.unsafeSymbol(named: "postReload", withSignature: PostFunction.self)
+        post?(memory)
     }
 
-    guard let loop = currentCore.symbol(named: "update") else {
+    guard let loop = lib.unsafeSymbol(named: "update", withSignature: UpdateFunction.self) else {
         print("update function missing")
         continue
     }
 
-    unsafeBitCast(loop, to: UpdateFunction.self)(memory)
-
-    //
-    // Set to most recently update lib
-    switch (coreDylib.lastWriteTime, coreFramework.lastWriteTime) {
-    case let (dylib?, framework?) where dylib >= framework:
-        currentCore = coreDylib
-
-    case let (dylib?, framework?) where dylib < framework:
-        currentCore = coreFramework
-
-    case (_?, _):
-        currentCore = coreDylib
-
-    case (_, _?):
-        currentCore = coreFramework
-        
-    case (_, _):
-        fatalError("No code to load")
-    }
+    loop(memory)
 }
 
 print("Did quit cleanly!")

@@ -283,6 +283,7 @@ enum MouseButton {
     MouseButton6 = 5,
     MouseButton7 = 6,
     MouseButton8 = 7,
+    MouseButtonLast   = MouseButton8,
     MouseButtonLeft   = MouseButton1,
     MouseButtonRight  = MouseButton2,
     MouseButtonMiddle = MouseButton3,
@@ -302,11 +303,16 @@ enum MouseButton {
 /**********************************/
 #define API extern
 
+typedef struct State State;
+
 #ifdef __cplusplus
 extern "C" {            // Prevents name mangling of functions
 #endif
 
-f64 frameTime;
+// For tricky dynamic code reloading.
+API State* GetState();
+API void SetState(State* state);
+
 
 API void InitWindow(i32 width, i32 height, const char* title);     // Initialize Window and OpenGL Graphics
 API void CloseWindow(void);                                        // Close Window and Terminate Context
@@ -340,6 +346,7 @@ API void ClearBackground(Color color);                             // Sets Backg
 API void BeginFrame(void);                                         // Setup drawing canvas to start drawing
 API void EndFrame(void);                                           // End canvas drawing and Swap Buffers (Double Buffers)
 API f64  GetTime(void);                                            // Returns the time since InitTimer() was cal
+API f64  GetFrameTime(void);
 
 API u32  TextureLoad(const char* fileName);                        // Loads a texture from a file and returns a handle
 
@@ -393,51 +400,6 @@ API void DrawTextureClip(u32 id, V2 destCenter, V2 destSize, V2 srcCenter,  V2 s
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-/**GLOBALS********************************************************/
-/*                                                               */
-/*    ######   ##        #######  ########     ###    ##         */
-/*   ##    ##  ##       ##     ## ##     ##   ## ##   ##         */
-/*   ##        ##       ##     ## ##     ##  ##   ##  ##         */
-/*   ##   #### ##       ##     ## ########  ##     ## ##         */
-/*   ##    ##  ##       ##     ## ##     ## ######### ##         */
-/*   ##    ##  ##       ##     ## ##     ## ##     ## ##         */
-/*    ######   ########  #######  ########  ##     ## ########   */
-/*                                                               */
-/*****************************************************************/
-
-//-----------------------------------------------------------------
-// Stuff
-//-----------------------------------------------------------------
-
-u8 configFlags;
-
-GLFWwindow* window;
-
-i32 screenWidth, screenHeight;
-i32 displayWidth, displayHeight;
-i32 renderWidth, renderHeight;
-
-// Register Mouse States
-i8 previousMouseState[GLFW_MOUSE_BUTTON_LAST] = { 0 };
-i8 currentMouseState[GLFW_MOUSE_BUTTON_LAST]  = { 0 };
-i32 previousMouseWheelY = 0;
-i32 currentMouseWheelY  = 0;
-
-// Register Keyboard States
-i8 previousKeyState[GLFW_KEY_LAST] = { 0 };
-i8 currentKeyState[GLFW_KEY_LAST]  = { 0 };
-
-i32 lastKeyPressed = -1;
-
-V2 mousePosition;
-
-f64 currentTime, previousTime;    // Used to track timmings
-f64 updateTime, drawTime;         // Time measures for update and draw
-f64 frameTime;                    // Time measure for one frame
-f64 targetTime = 1.f / 60.f;      // Desired time for one frame, if 0 not applied
-
-i32 exitKey = GLFW_KEY_ESCAPE;
-
 //-----------------------------------------------------------------
 // OpenGL STUFF
 //-----------------------------------------------------------------
@@ -488,28 +450,129 @@ typedef struct RenderBuffer {
     u32 vbo[3];             // OpenGL Vertex Buffer Object (1 for color, 1 for positions, 1 for texcoords)
 } RenderBuffer;
 
-u32 quadIndicesVBO;
-u32 whiteTexture;
+/**GLOBALS********************************************************/
+/*                                                               */
+/*    ######   ##        #######  ########     ###    ##         */
+/*   ##    ##  ##       ##     ## ##     ##   ## ##   ##         */
+/*   ##        ##       ##     ## ##     ##  ##   ##  ##         */
+/*   ##   #### ##       ##     ## ########  ##     ## ##         */
+/*   ##    ##  ##       ##     ## ##     ## ######### ##         */
+/*   ##    ##  ##       ##     ## ##     ## ##     ## ##         */
+/*    ######   ########  #######  ########  ##     ## ########   */
+/*                                                               */
+/*****************************************************************/
+
+//-----------------------------------------------------------------
+// Stuff
+//-----------------------------------------------------------------
 
 #define VBO_POSITION  0
 #define VBO_COLOR     1
 #define VBO_TEXCOORD  2
 
-RenderBuffer pixels;                // Default dynamic buffer for pixel data
-RenderBuffer lines;                 // Default dynamic buffer for lines data
-RenderBuffer connectedLines;        // Default dynamic buffer for connnected lines data
-RenderBuffer triangles;             // Default dynamic buffer for triangles data
-RenderBuffer quads;                 // Default dynamic buffer for quads data (used to draw textures)
-RenderBuffer texturedQuads;         // Default buffer for drawing textured quads from
+typedef struct State State;
+struct State {
 
-Atlas* currentAtlas;
-Shader currentShader;
-RenderBuffer* currentRenderBuffer;
-Color currentColor;
-Camera currentCamera;
+    GLFWwindow* window;
 
-f32 minLineWidth;
-f32 maxLineWidth;
+    i32 screenWidth, screenHeight;
+    i32 displayWidth, displayHeight;
+    i32 renderWidth, renderHeight;
+
+    // Register Mouse States
+    i8 previousMouseState[MouseButtonLast];
+    i8 currentMouseState[MouseButtonLast];
+    i32 previousMouseWheelY;
+    i32 currentMouseWheelY;
+
+    // Register Keyboard States
+    i8 previousKeyState[KeyLast];
+    i8 currentKeyState[KeyLast];
+
+    i32 lastKeyPressed;
+
+    V2 mousePosition;
+
+    f64 currentTime, previousTime;    // Used to track timmings
+    f64 updateTime, drawTime;         // Time measures for update and draw
+    f64 frameTime;                    // Time measure for one frame
+    f64 targetTime;      // Desired time for one frame, if 0 not applied
+
+    i32 exitKey;
+
+    u32 quadIndicesVBO;
+    u32 whiteTexture;
+
+    RenderBuffer pixels;                // Default dynamic buffer for pixel data
+    RenderBuffer lines;                 // Default dynamic buffer for lines data
+    RenderBuffer connectedLines;        // Default dynamic buffer for connnected lines data
+    RenderBuffer triangles;             // Default dynamic buffer for triangles data
+    RenderBuffer quads;                 // Default dynamic buffer for quads data (used to draw textures)
+    RenderBuffer texturedQuads;         // Default buffer for drawing textured quads from
+
+    Atlas* currentAtlas;
+    Shader currentShader;
+    RenderBuffer* currentRenderBuffer;
+    Color currentColor;
+    Camera currentCamera;
+
+    f32 minLineWidth;
+    f32 maxLineWidth;
+};
+
+// NOTE(vdka): This is more of a marker than an acutal macro
+#define GLOBAL
+
+GLOBAL GLFWwindow* window;
+
+GLOBAL i32 screenWidth, screenHeight;
+GLOBAL i32 displayWidth, displayHeight;
+GLOBAL i32 renderWidth, renderHeight;
+
+// Register Mouse States
+GLOBAL i8 previousMouseState[GLFW_MOUSE_BUTTON_LAST] = { 0 };
+GLOBAL i8 currentMouseState[GLFW_MOUSE_BUTTON_LAST]  = { 0 };
+GLOBAL i32 previousMouseWheelY = 0;
+GLOBAL i32 currentMouseWheelY  = 0;
+
+// Register Keyboard States
+GLOBAL i8 previousKeyState[GLFW_KEY_LAST] = { 0 };
+GLOBAL i8 currentKeyState[GLFW_KEY_LAST]  = { 0 };
+
+GLOBAL i32 lastKeyPressed = -1;
+
+GLOBAL V2 mousePosition;
+
+GLOBAL f64 currentTime, previousTime;    // Used to track timmings
+GLOBAL f64 updateTime, drawTime;         // Time measures for update and draw
+GLOBAL f64 frameTime;                    // Time measure for one frame
+GLOBAL f64 targetTime = 1.f / 60.f;      // Desired time for one frame, if 0 not applied
+
+GLOBAL i32 exitKey = GLFW_KEY_ESCAPE;
+
+GLOBAL u32 quadIndicesVBO;
+GLOBAL u32 whiteTexture;
+
+#define VBO_POSITION  0
+#define VBO_COLOR     1
+#define VBO_TEXCOORD  2
+
+GLOBAL RenderBuffer pixels;                // Default dynamic buffer for pixel data
+GLOBAL RenderBuffer lines;                 // Default dynamic buffer for lines data
+GLOBAL RenderBuffer connectedLines;        // Default dynamic buffer for connnected lines data
+GLOBAL RenderBuffer triangles;             // Default dynamic buffer for triangles data
+GLOBAL RenderBuffer quads;                 // Default dynamic buffer for quads data (used to draw textures)
+GLOBAL RenderBuffer texturedQuads;         // Default buffer for drawing textured quads from
+
+GLOBAL Atlas* currentAtlas;
+GLOBAL Shader currentShader;
+GLOBAL RenderBuffer* currentRenderBuffer;
+GLOBAL Color currentColor;
+GLOBAL Camera currentCamera;
+
+GLOBAL f32 minLineWidth;
+GLOBAL f32 maxLineWidth;
+
 
 /**SHADERS*******************************************************************/
 /*                                                                          */
@@ -1020,7 +1083,6 @@ static void InitGraphicsDevice(i32 width, i32 height, const char* title) {
     glfwMakeContextCurrent(window);
 
     gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
-    gladLoadGL();
     if(!gladLoadGL()) Log(ERROR, "Failed to initialize GLAD");
 
 #ifdef __APPLE__
@@ -1146,7 +1208,121 @@ static i32 GetNumCircleSegments(f32 radius) {
 /*                                                                                                                                */
 /**********************************************************************************************************************************/
 
+// TODO(vdka): Switch DEF to IMP
 #define DEF inline
+
+
+DEF State* GetState() {
+
+    // Note: We have only this as a global so it can make dylib stuff easier.
+    State* state = malloc(sizeof *state);
+
+    state->window = window;
+
+    state->screenWidth   = screenWidth;
+    state->displayWidth  = displayWidth;
+    state->displayWidth  = displayWidth;
+    state->displayHeight = displayHeight;
+    state->renderWidth   = renderWidth;
+    state->renderHeight  = renderHeight;
+
+    state->previousMouseState[0] = &previousMouseState;
+    state->currentMouseState[0] = &currentMouseState;
+    state->previousMouseWheelY = previousMouseWheelY;
+    state->currentMouseWheelY = currentMouseWheelY;
+
+    state->previousKeyState[0] = previousKeyState;
+    state->currentKeyState[0] = currentKeyState;
+
+    state->lastKeyPressed = lastKeyPressed;
+
+    state->mousePosition = mousePosition;
+
+    state->currentTime = currentTime;
+    state->previousTime = previousTime;
+    state->updateTime = updateTime;
+    state->drawTime = drawTime;
+    state->frameTime = frameTime;
+    state->targetTime = targetTime;
+
+    state->exitKey = exitKey;
+
+    state->quadIndicesVBO = quadIndicesVBO;
+    state->whiteTexture = whiteTexture;
+
+    state->pixels = pixels;
+    state->lines = lines;
+    state->connectedLines = connectedLines;
+    state->triangles = triangles;
+    state->quads = quads;
+    state->texturedQuads = texturedQuads;
+
+    state->currentAtlas = currentAtlas;
+    state->currentShader = currentShader;
+    state->currentRenderBuffer = currentRenderBuffer;
+    state->currentColor = currentColor;
+    state->currentCamera = currentCamera;
+
+    state->minLineWidth = minLineWidth;
+    state->maxLineWidth = maxLineWidth;
+
+    return state;
+};
+
+DEF void SetState(State* state) {
+
+    gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
+    if(!gladLoadGL()) Log(ERROR, "Failed to initialize GLAD");
+
+    window = state->window;
+
+    screenWidth   = state->screenWidth;
+    displayWidth  = state->displayWidth;
+    displayWidth  = state->displayWidth;
+    displayHeight = state->displayHeight;
+    renderWidth   = state->renderWidth;
+    renderHeight  = state->renderHeight;
+
+    previousMouseState[0] = state->previousMouseState;
+    currentMouseState[0] = state->currentMouseState;
+    previousMouseWheelY = state->previousMouseWheelY;
+    currentMouseWheelY = state->currentMouseWheelY;
+
+    previousKeyState[0] = state->previousKeyState;
+    currentKeyState[0] = state->currentKeyState;
+
+    lastKeyPressed = state->lastKeyPressed;
+
+    mousePosition = state->mousePosition;
+
+    currentTime = state->currentTime;
+    previousTime = state->previousTime;
+    updateTime = state->updateTime;
+    drawTime = state->drawTime;
+    frameTime = state->frameTime;
+    targetTime = state->targetTime;
+
+    exitKey = state->exitKey;
+
+    quadIndicesVBO = state->quadIndicesVBO;
+    whiteTexture = state->whiteTexture;
+
+    pixels = state->pixels;
+    lines = state->lines;
+    connectedLines = state->connectedLines;
+    triangles = state->triangles;
+    quads = state->quads;
+    texturedQuads = state->texturedQuads;
+
+    currentAtlas = state->currentAtlas;
+    currentShader = state->currentShader;
+    currentRenderBuffer = state->currentRenderBuffer;
+    currentColor = state->currentColor;
+    currentCamera = state->currentCamera;
+    
+    minLineWidth = state->minLineWidth;
+    maxLineWidth = state->maxLineWidth;
+}
 
 DEF void InitWindow(i32 width, i32 height, const char* title) {
     Log(INFO, "Initializing ...");
@@ -1305,6 +1481,10 @@ DEF void EndFrame(void) {
 
 DEF f64 GetTime(void) {
     return glfwGetTime();
+}
+
+DEF f64 GetFrameTime(void) {
+    return frameTime;
 }
 
 DEF u32 TextureLoad(const char* fileName) {

@@ -10,7 +10,7 @@ base_dir=$(pwd)
 
 c_flags="-Xcc -I/usr/local/include"
 
-swiftc_flags="-Xswiftc -static-executable -Xswiftc -static-stdlib"
+swiftc_flags="-Xswiftc -no-link-objc-runtime"
 linker_flags="-Xlinker -L/usr/local/lib -Xlinker -lglfw"
 
 target_dir="${base_dir}/bin"
@@ -23,9 +23,8 @@ build)
 
     mkdir -p ${target_dir}
 
-    cp -f .build/debug/LoopStatic         ${target_dir}
+    cp -f .build/debug/Asteroids          ${target_dir}
     cp -f .build/debug/LoopDynamic        ${target_dir}
-    cp -f .build/debug/libAsteroids.dylib ${target_dir}
 ;;
 xcode)
     swift package generate-xcodeproj

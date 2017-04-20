@@ -32,7 +32,6 @@ public final class DynamicLib {
     }
 
     public func load() {
-
         guard dlopen_preflight(path) else {
             fatalError(dlError)
         }
@@ -47,6 +46,7 @@ public final class DynamicLib {
     }
 
     public func unload() {
+
         guard let handle = handle else {
             fatalError(dlError)
         }
@@ -94,6 +94,7 @@ public final class DynamicLib {
 
         return symbol
     }
+
     var dlError: String {
         return String(cString: dlerror())
     }

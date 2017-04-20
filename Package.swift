@@ -7,7 +7,6 @@ let package = Package(
     targets: [
       Target(name: "muse"),
       Target(name: "Asteroids", dependencies: [.Target(name: "muse")]),
-      Target(name: "LoopStatic", dependencies: [.Target(name: "Asteroids")]),
       Target(name: "LoopDynamic"),
     ]
 )

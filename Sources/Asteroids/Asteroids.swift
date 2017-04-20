@@ -79,44 +79,54 @@ extension V2: CustomStringConvertible {
 }
 
 struct GameState {
-    var shouldQuit: Bool
+    var currStateSize: Int
     var camera: Camera
-}
+    var museState: OpaquePointer
 
-
-func write<T>(_ value: inout T, to destinationPointer: UnsafeMutableRawPointer) {
-
-    withUnsafeMutablePointer(to: &value) { valuePointer in
-
-        destinationPointer.copyBytes(from: valuePointer, count: MemoryLayout<T>.size)
+    init(camera: Camera) {
+        self.currStateSize = MemoryLayout<GameState>.size
+        self.camera = camera
+        self.museState = GetState()
     }
 }
 
+@_silgen_name("preReload")
+func preReload(statePtr: UnsafeMutablePointer<GameState>) -> Void {
+    // TODO(vdka): Handle GameState size changes. These would be bad. Very, very bad.
+    //   I think we will need a serialization format in order to persist and read back values
+    //   Alternatively we could limit ourselves to adding state things to the end of the GameState
+    statePtr.pointee.museState = GetState()
+}
+
+@_silgen_name("postReload")
+func postReload(statePtr: UnsafeMutablePointer<GameState>) -> Void {
+    SetState(statePtr.pointee.museState)
+}
+
 @_silgen_name("setup")
-public func setup() -> UnsafeMutableRawPointer {
+func setup() -> UnsafeMutablePointer<GameState> {
 
     InitWindow(640, 480, "Asteroids")
 
     let camera = Camera(x: 0, y: 0, width: 3.2, height: 2.4)
-    var gameState = GameState(shouldQuit: WindowShouldClose(), camera: camera)
+    let gameState = GameState(camera: camera)
 
     SetCamera(camera)
 
-    let memory = UnsafeMutableRawPointer.allocate(bytes: 1024, alignedTo: 1)
-
-    write(&gameState, to: memory)
+    let memory = UnsafeMutablePointer<GameState>.allocate(capacity: 1)
+    memory.pointee = gameState
 
     return memory
 }
 
 @_silgen_name("update")
-public func update(_ memory: UnsafeMutableRawPointer) {
+func update(_ memory: UnsafeMutablePointer<GameState>) {
 
-    var gameState = memory.bindMemory(to: GameState.self, capacity: 1).pointee
-    defer { write(&gameState, to: memory) }
+    var gameState = memory.pointee
+    defer { memory.pointee = gameState }
 
     if WindowShouldClose() {
-        gameState.shouldQuit = true
+        gameState.currStateSize = 0
 
         //
         // Deinitialize any resources
@@ -126,10 +136,10 @@ public func update(_ memory: UnsafeMutableRawPointer) {
         return
     }
 
-    if IsKeyDown(KeyD) { gameState.camera.x += 1 * Float(frameTime) }
-    if IsKeyDown(KeyA) { gameState.camera.x -= 1 * Float(frameTime) }
-    if IsKeyDown(KeyW) { gameState.camera.y += 1 * Float(frameTime) }
-    if IsKeyDown(KeyS) { gameState.camera.y -= 1 * Float(frameTime) }
+    if IsKeyDown(KeyD) { gameState.camera.x += 1 * Float(GetFrameTime()) }
+    if IsKeyDown(KeyA) { gameState.camera.x -= 1 * Float(GetFrameTime()) }
+    if IsKeyDown(KeyW) { gameState.camera.y += 1 * Float(GetFrameTime()) }
+    if IsKeyDown(KeyS) { gameState.camera.y -= 1 * Float(GetFrameTime()) }
 
     SetCamera(gameState.camera)
 
@@ -145,7 +155,6 @@ public func update(_ memory: UnsafeMutableRawPointer) {
     BeginFrame()
     ClearBackground(.white)
 
-    print("ASDFASDF")
 
 //    FillTriXY(0, 0, 0, 0.5, 0.25, 0.25, .red)
 //    FillTriXY(0, 0, 0.25, 0.25, 0.5, 0, .green)
@@ -160,9 +169,9 @@ public func update(_ memory: UnsafeMutableRawPointer) {
     //    FillQuadCentered(V2(x: -0.5, y: 0.75), V2(x: 0.1, y: 0.5), .black)
     //    DrawLine(0.5, 0.5, 0.5, 1.1, .black)
 
-    FillCircle(mouse, 0.05, .blue)
+    FillCircle(mouse, 0.05, .green)
 
-    FillPoly(V2(x: 0.5, y: 1), 6, 0.25, .green)
+    FillPoly(V2(x: 0.5, y: 1), 6, 0.25, .blue)
 
     EndFrame()
 }
