@@ -4,7 +4,7 @@ let baseDir = "/" + Array(#file.characters.split(separator: "/").dropLast(3)).ma
 
 let buildDir = baseDir
 
-let lib = DynamicLib(path: buildDir + "/bin/Asteroids")
+let lib = DynamicLib(path: "@executable_path/Asteroids")
 lib.load()
 
 // If return nil there was an error during initialization

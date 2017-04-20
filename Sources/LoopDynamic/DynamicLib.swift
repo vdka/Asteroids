@@ -1,5 +1,6 @@
 
 import Darwin.C
+import Foundation
 
 func curTime() -> Double {
 
@@ -8,6 +9,10 @@ func curTime() -> Double {
 
     return Double(tv.tv_sec) + Double(tv.tv_usec) / 1000000
 }
+
+// TODO(vdka): Get the current executing file directory using Dl_info for use as executablePath
+
+let executablePath = "/" + Array(CommandLine.arguments.first!.characters.split(separator: "/").dropLast()).map(String.init).joined(separator: "/")
 
 public final class DynamicLib {
 
@@ -24,7 +29,7 @@ public final class DynamicLib {
 
     public init(path: String) {
 
-        self.path = path
+        self.path = path.replacingOccurrences(of: "@executable_path", with: executablePath)
     }
 
     deinit {
