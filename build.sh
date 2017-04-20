@@ -23,6 +23,7 @@ build)
 
     mkdir -p ${target_dir}
 
+    cp -f .build/debug/libmuse.dylib      ${target_dir}
     cp -f .build/debug/Asteroids          ${target_dir}
     cp -f .build/debug/LoopDynamic        ${target_dir}
 ;;
@@ -37,4 +38,8 @@ esac
 
 swift build $c_flags $swiftc_flags $linker_flags &&
   echo "Build Succeeded!" || echo "Build Failed!"
+
+# Tweak the outputted binary to search the bin directory alongside itself for libmuse.dylib
+
+install_name_tool -change $(pwd)/.build/debug/libmuse.dylib @executable_path/libmuse.dylib $(pwd)/bin/Asteroids
 
