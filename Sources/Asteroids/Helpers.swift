@@ -18,10 +18,21 @@ extension Color: ExpressibleByIntegerLiteral {
     static var blue:  Color = 0x0000ffff
 }
 
-extension V2: CustomStringConvertible {
-    static let zero = V2(x: 0, y: 0)
+func dumpMemory<T>(of input: T) {
 
-    public var description: String {
-        return "(\(x), \(y))"
+    var input = input
+
+    withUnsafeBytes(of: &input) { buffer in
+
+        for (i, v) in buffer.enumerated() {
+            if i % 8 == 0 && i != 0 { print("\n", terminator: "") }
+
+            let hexByte = String(v, radix: 16)
+
+            // Pad the output to be 2 characters wide
+            if hexByte.characters.count == 1 { print("0", terminator: "") }
+            print(hexByte, terminator: " ")
+        }
+        print("")
     }
 }

@@ -53,20 +53,6 @@ func raycast(from rayStart: V2, to rayEnd: V2, _ seg1: V2, seg2: V2) -> V2 {
     return collision
 }
 
-struct GameState {
-    var currStateSize: Int
-    var camera: Camera
-    var museState: OpaquePointer
-
-    var entities: [Entity] = []
-
-    init(camera: Camera) {
-        self.currStateSize = MemoryLayout<GameState>.size
-        self.camera = camera
-        self.museState = GetState()
-    }
-}
-
 @_silgen_name("preReload")
 func preReload(statePtr: UnsafeMutablePointer<GameState>) -> Void {
     // TODO(vdka): Handle GameState size changes. These would be bad. Very, very bad.
@@ -90,8 +76,8 @@ func setup() -> UnsafeMutablePointer<GameState> {
 
     SetCamera(camera)
 
-    let player = Entity(kind: EntityKindPlayer, position: .zero, velocity: .zero, direction: 0)
-    gameState.entities.append(player)
+    var player = Entity(position: .zero, velocity: .zero, direction: 0, kind: .player(isFiring: false, isAccelerating: false))
+    gameState.add(&player)
 
     let memory = UnsafeMutablePointer<GameState>.allocate(capacity: 1)
     memory.pointee = gameState
@@ -116,26 +102,6 @@ func update(_ memory: UnsafeMutablePointer<GameState>) {
         return
     }
 
-    var player = gameState.entities[0]
-    if IsKeyDown(KeyD) {
-        gameState.camera.x += 1 * Float(GetFrameTime())
-        player.direction -= 0.1
-    }
-    if IsKeyDown(KeyA) {
-
-        player.direction += 0.1
-        gameState.camera.x -= 1 * Float(GetFrameTime())
-    }
-    if IsKeyDown(KeyW) {
-        gameState.camera.y += 1 * Float(GetFrameTime())
-
-        let flame = Entity(kind: EntityKindExhaust, position: player.position, velocity: player.velocity, direction: player.direction)
-        gameState.entities.append(flame)
-    }
-    if IsKeyDown(KeyS) {
-        gameState.camera.y -= 1 * Float(GetFrameTime())
-    }
-
 
     gameState.camera.width  = 320
     gameState.camera.height = 240
@@ -143,15 +109,21 @@ func update(_ memory: UnsafeMutablePointer<GameState>) {
 
     let mouse = WorldToCamera(GetMousePosition())
 
+    FillCircle(mouse, 10, .red)
+
     if IsMouseButtonDown(MouseButtonLeft) {
         pred = true
     }
-    // TODO(vdka): Zoom
+
+    for var entity in gameState.entities.values {
+        update(&entity, &gameState)
+        gameState.update(entity)
+    }
 
     BeginFrame()
     ClearBackground(.black)
 
-    for entity in gameState.entities {
+    for entity in gameState.entities.values {
 
         draw(entity)
     }

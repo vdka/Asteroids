@@ -324,10 +324,10 @@ API void SetCamera(Camera camera);
 API V2   WorldToCamera(V2 point);
 
 
-API b8   IsMouseButtonPressed(MouseButton button);                         // Detect if a mouse button has been pressed once
-API b8   IsMouseButtonDown(MouseButton button);                            // Detect if a mouse button is being pressed
-API b8   IsMouseButtonReleased(MouseButton button);                        // Detect if a mouse button has been released once
-API b8   IsMouseButtonUp(MouseButton button);                              // Detect if a mouse button is NOT being pressed
+API b8   IsMouseButtonPressed(MouseButton button);                 // Detect if a mouse button has been pressed once
+API b8   IsMouseButtonDown(MouseButton button);                    // Detect if a mouse button is being pressed
+API b8   IsMouseButtonReleased(MouseButton button);                // Detect if a mouse button has been released once
+API b8   IsMouseButtonUp(MouseButton button);                      // Detect if a mouse button is NOT being pressed
 API i32  GetMouseX(void);                                          // Returns mouse position X
 API i32  GetMouseY(void);                                          // Returns mouse position Y
 API V2   GetMousePosition(void);                                   // Returns the current mouse position
