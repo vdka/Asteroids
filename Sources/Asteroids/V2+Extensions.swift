@@ -3,7 +3,11 @@ import muse
 
 extension V2 {
 
-    static let zero = V2(x: 0, y: 0)
+    static let zero  = V2(x: 0, y: 0)
+    static let up    = V2(x: 0, y: 1)
+    static let down  = V2(x: 0, y: -1)
+    static let right = V2(x: 1, y: 0)
+    static let left  = V2(x: -1, y: 0)
 
     var lengthSquared: f32 {
         return x * x + y * y

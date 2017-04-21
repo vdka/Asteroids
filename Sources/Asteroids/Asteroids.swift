@@ -53,6 +53,42 @@ func raycast(from rayStart: V2, to rayEnd: V2, _ seg1: V2, seg2: V2) -> V2 {
     return collision
 }
 
+func makeAsteroid(size: Int, rng: inout PCGRand32) -> Entity {
+
+    var points: [V2] = []
+
+    let minRadius: f32 = 8
+    let maxRadius: f32 = 20
+
+    let granularity: f32 = 10
+
+    let minVariation: f32 = 0.15 * TAU
+    let maxVariation: f32 = 0.28 * TAU
+
+    var angle: f32 = 0
+    while angle <= TAU - maxVariation {
+
+        let angleVariance = rng.boundedNext(maxVariation - minVariation) + minVariation
+        let angleFinal = angle + angleVariance
+
+        let radius = rng.boundedNext(maxRadius - minRadius) + minRadius
+
+        let x = sin(angleFinal) * radius
+        let y = -cos(angleFinal) * radius
+
+        points.append(V2(x, y))
+
+        angle += TAU / granularity
+    }
+
+    let minVelocity: f32 = 10
+    let maxVelocity: f32 = 50
+    let velocity: f32    = rng.boundedNext(maxVelocity - minVelocity) + minVelocity
+    let direction: f32   = rng.boundedNext(TAU)
+
+    return Entity(position: V2(-130, -120), velocity: V2.up.rotated(by: direction) * velocity, direction: direction, kind: .asteroid(size: size, points: points))
+}
+
 @_silgen_name("preReload")
 func preReload(statePtr: UnsafeMutablePointer<GameState>) -> Void {
     // TODO(vdka): Handle GameState size changes. These would be bad. Very, very bad.
@@ -76,7 +112,7 @@ func setup() -> UnsafeMutablePointer<GameState> {
 
     SetCamera(camera)
 
-    var player = Entity(position: .zero, velocity: .zero, direction: 0, kind: .player(isFiring: false, isAccelerating: false))
+    var player = Entity(position: .zero, velocity: .zero, direction: 0, kind: .player(weaponCooldown: 0, isAccelerating: false))
     gameState.add(&player)
 
     let memory = UnsafeMutablePointer<GameState>.allocate(capacity: 1)
@@ -96,20 +132,16 @@ func update(_ memory: UnsafeMutablePointer<GameState>) {
 
         //
         // Deinitialize any resources
-        //
         CloseWindow()
 
         return
     }
-
 
     gameState.camera.width  = 320
     gameState.camera.height = 240
     SetCamera(gameState.camera)
 
     let mouse = WorldToCamera(GetMousePosition())
-
-    FillCircle(mouse, 10, .red)
 
     if IsMouseButtonDown(MouseButtonLeft) {
         pred = true
@@ -122,6 +154,9 @@ func update(_ memory: UnsafeMutablePointer<GameState>) {
 
     BeginFrame()
     ClearBackground(.black)
+
+
+    FillCircle(mouse, 10, .blue)
 
     for entity in gameState.entities.values {
 

@@ -7,8 +7,15 @@ extension Color: ExpressibleByIntegerLiteral {
         self = unsafeBitCast(value.bigEndian, to: Color.self)
     }
 
-    public init(rgba: UInt32) {
+    init(rgba: UInt32) {
         self.rgba = rgba.bigEndian
+    }
+
+    init(r: Float, g: Float, b: Float, a: Float = 1.0) {
+        self.r = UInt8(255 * r)
+        self.g = UInt8(255 * g)
+        self.b = UInt8(255 * b)
+        self.a = UInt8(255 * a)
     }
 
     static var white: Color = 0xffffffff

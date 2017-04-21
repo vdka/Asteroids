@@ -101,7 +101,7 @@ public final class DynamicLib {
         }
         load()
 
-        print("Reload successful!")
+        print("Reload successful! \(time(nil))")
     }
 
     public func unsafeSymbol<T>(named name: String, withSignature: T.Type) -> T? {

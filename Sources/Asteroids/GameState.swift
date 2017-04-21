@@ -6,6 +6,7 @@ struct GameState {
     var camera: Camera
     var museState: OpaquePointer
 
+    var rng = PCGRand32()
     var nextEntityId: Int = 1
     var entities: [Int: Entity] = [:]
 //    var entities = Arena<Entity>(capacity: 50)
