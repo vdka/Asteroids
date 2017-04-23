@@ -1,4 +1,5 @@
 
+
 import muse
 
 let sourceRoot = "/" + #file.characters.split(separator: "/").dropLast(3).map(String.init).joined(separator: "/")
@@ -57,10 +58,10 @@ func makeAsteroid(size: Int, rng: inout PCGRand32) -> Entity {
 
     var points: [V2] = []
 
-    let minRadius: f32 = 8
+    let minRadius: f32 = 14
     let maxRadius: f32 = 20
 
-    let granularity: f32 = 10
+    let granularity: f32 = 0.1 * TAU
 
     let minVariation: f32 = 0.15 * TAU
     let maxVariation: f32 = 0.28 * TAU
@@ -107,16 +108,16 @@ func setup() -> UnsafeMutablePointer<GameState> {
 
     InitWindow(640, 480, "Asteroids")
 
-    let camera = Camera(x: 0, y: 0, width: 3.2, height: 2.4)
+    let camera = Camera(x: 0, y: 0, width: 320, height: 240)
     var gameState = GameState(camera: camera)
 
     SetCamera(camera)
 
-    var player = Entity(position: .zero, velocity: .zero, direction: 0, kind: .player(weaponCooldown: 0, isAccelerating: false))
-    gameState.add(&player)
+    let player = Entity(position: .zero, velocity: .zero, direction: 0, kind: .player(weaponCooldown: 0, isAccelerating: false))
+    gameState.entities.append(player)
 
     let memory = UnsafeMutablePointer<GameState>.allocate(capacity: 1)
-    memory.pointee = gameState
+    memory.initialize(to: gameState)
 
     return memory
 }
@@ -137,9 +138,11 @@ func update(_ memory: UnsafeMutablePointer<GameState>) {
         return
     }
 
-    gameState.camera.width  = 320
-    gameState.camera.height = 240
-    SetCamera(gameState.camera)
+    if IsKeyDown(KeyN), gameState.rng.boundedNext(20) == 0 {
+        let asteroid = makeAsteroid(size: 1, rng: &gameState.rng)
+
+        gameState.entities.append(asteroid)
+    }
 
     let mouse = WorldToCamera(GetMousePosition())
 
@@ -147,21 +150,45 @@ func update(_ memory: UnsafeMutablePointer<GameState>) {
         pred = true
     }
 
-    for var entity in gameState.entities.values {
+    for (index, var entity) in gameState.entities.enumerated() {
         update(&entity, &gameState)
-        gameState.update(entity)
+        gameState.entities[index] = entity
+    }
+
+    for (index, var particle) in gameState.particles.enumerated() {
+        update(&particle, &gameState)
+        gameState.particles[index] = particle
     }
 
     BeginFrame()
     ClearBackground(.black)
 
+    FillCircle(mouse, 10, .red)
 
-    FillCircle(mouse, 10, .blue)
-
-    for entity in gameState.entities.values {
-
+    for entity in gameState.entities {
         draw(entity)
+    }
+    for particle in gameState.particles {
+        draw(particle)
     }
 
     EndFrame()
+
+    var nextEntities = Array<Entity>()
+    nextEntities.reserveCapacity(gameState.entities.count)
+    for entity in gameState.entities {
+        if !entity.flags.contains(.dead) {
+            nextEntities.append(entity)
+        }
+    }
+    gameState.entities = nextEntities
+
+    var nextParticles = Array<Particle>()
+    nextParticles.reserveCapacity(gameState.particles.count)
+    for particle in gameState.particles {
+        if particle.remainingTicks > 0 {
+            nextParticles.append(particle)
+        }
+    }
+    gameState.particles = nextParticles
 }

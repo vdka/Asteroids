@@ -12,10 +12,10 @@ extension Color: ExpressibleByIntegerLiteral {
     }
 
     init(r: Float, g: Float, b: Float, a: Float = 1.0) {
-        self.r = UInt8(255 * r)
-        self.g = UInt8(255 * g)
-        self.b = UInt8(255 * b)
-        self.a = UInt8(255 * a)
+        self.r = UInt8(255 * max(min(r, 1), 0))
+        self.g = UInt8(255 * max(min(g, 1), 0))
+        self.b = UInt8(255 * max(min(b, 1), 0))
+        self.a = UInt8(255 * max(min(a, 1), 0))
     }
 
     static var white: Color = 0xffffffff
@@ -23,6 +23,22 @@ extension Color: ExpressibleByIntegerLiteral {
     static var red:   Color = 0xff0000ff
     static var green: Color = 0x00ff00ff
     static var blue:  Color = 0x0000ffff
+}
+
+func clamp(_ n: f32, lower: f32, upper: f32) -> f32 {
+    return max(lower, min(n, upper))
+}
+
+func wrap(_ n: f32, lower: f32, upper: f32) -> f32 {
+
+    if n >= upper {
+        return lower
+    }
+    if n <= lower {
+        return upper
+    }
+
+    return n
 }
 
 func dumpMemory<T>(of input: T) {

@@ -77,9 +77,34 @@ public struct PCGRand32 {
         return state &* Constant.multiplier &+ increment
     }
 
+}
+
+extension PCGRand32 {
+
     mutating func boundedNext(_ bound: Float) -> Float {
         let val = next()
 
         return (Float(val) / Float(UInt32.max)) * bound
+    }
+
+    /// - Returns: normally distrubuted random number between 0 & 1
+    mutating func normallyDistributedNext(center: Float = 0.5, maxWidth: Float = 1) -> Float {
+        let iterations = 160
+
+        var total: Float = 0
+        for _ in 0..<iterations {
+            let val = boundedNext(maxWidth)
+            assert(val <= maxWidth)
+            assert(val >= 0)
+            total += val
+        }
+
+        let avg = total / Float(iterations)
+
+        let result = avg + center - maxWidth / 2
+        assert(result < center + maxWidth / 2)
+        assert(result > center - maxWidth / 2)
+
+        return result
     }
 }

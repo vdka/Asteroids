@@ -3,27 +3,33 @@ import muse
 
 struct Entity {
 
-    var id: Int
     var position: V2
     var velocity: V2
     var direction: f32
 
+    var flags: Flag
     var kind: Kind
 
     enum Kind {
         case player(weaponCooldown: Int, isAccelerating: Bool)
-        case exhaust(ticks: Int)
         case bullet(ticks: Int)
 
         case asteroid(size: Int, points: [V2])
     }
 
-    init(position: V2, velocity: V2 = .zero, direction: f32 = 0, kind: Kind) {
-        self.id = -1
+    struct Flag: OptionSet {
+        var rawValue: UInt8
+
+        static let none = Flag(rawValue: 0b00000000)
+        static let dead = Flag(rawValue: 0b00000001)
+    }
+
+    init(position: V2, velocity: V2 = .zero, direction: f32 = 0, kind: Kind, flags: Flag = .none) {
         self.position = position
         self.velocity = velocity
         self.direction = direction
         self.kind = kind
+        self.flags = flags
     }
 }
 
@@ -54,18 +60,6 @@ extension Entity {
         }
     }
 
-    var ExhaustTicks: Int {
-        get {
-            guard case .exhaust(let tuple) = kind else {
-                fatalError()
-            }
-            return tuple
-        }
-        set {
-            self.kind = .exhaust(ticks: newValue)
-        }
-    }
-
     var BulletTicks: Int {
         get {
             guard case .bullet(let tuple) = kind else {
@@ -79,7 +73,6 @@ extension Entity {
     }
 }
 
-// TODO(vdka): we need the game state here too.
 func update(_ entity: inout Entity, _ gameState: inout GameState) {
 
     let worldLeftBound  = gameState.camera.x - gameState.camera.width  / 2
@@ -87,31 +80,16 @@ func update(_ entity: inout Entity, _ gameState: inout GameState) {
     let worldUpperBound = gameState.camera.x + gameState.camera.height / 2
     let worldLowerBound = gameState.camera.x - gameState.camera.height / 2
 
-    func wrap(_ n: f32, lower: f32, upper: f32) -> f32 {
-
-        if n >= upper {
-            return lower
-        }
-        if n <= lower {
-            return upper
-        }
-
-        return n
-    }
-
     entity.position.x = wrap(entity.position.x, lower: worldLeftBound, upper: worldRightBound)
     entity.position.y = wrap(entity.position.y, lower: worldLowerBound, upper: worldUpperBound)
 
     entity.position += entity.velocity * f32(GetFrameTime())
 
-    if IsKeyDown(KeyN), gameState.rng.boundedNext(20) == 0 {
-        var asteroid = makeAsteroid(size: 1, rng: &gameState.rng)
-
-        gameState.add(&asteroid)
-    }
-
     switch entity.kind {
     case .player:
+
+        let facingVector = V2.up.rotated(by: entity.direction)
+
         if IsKeyDown(KeyD) {
 
             entity.direction -= 6 * f32(GetFrameTime())
@@ -124,14 +102,31 @@ func update(_ entity: inout Entity, _ gameState: inout GameState) {
 
             entity.Player.isAccelerating = true
 
-            let facingVector = V2.up.rotated(by: entity.direction)
-            var exhaust = Entity(
-                position: entity.position + (-facingVector * 3),
-                velocity: -facingVector * 100,
-                direction: entity.direction,
-                kind: .exhaust(ticks: 0)
-            )
-            gameState.add(&exhaust)
+            let numberOfExhaustParticlesToEmit = 3
+
+            let rot = gameState.rng.boundedNext(0.1 * TAU) - (0.1 * TAU) / 2
+            let exhaustVector = (-facingVector.rotated(by: rot) * 100) * gameState.rng.normallyDistributedNext(center: 1.0, maxWidth: 0.2)
+
+            for _ in 0..<numberOfExhaustParticlesToEmit {
+
+                let xOffset: Float = gameState.rng.boundedNext(shipAngle) - shipAngle / 2
+                let position = (entity.position + (-facingVector * 3)).rotated(by: xOffset, around: entity.position)
+
+                // use this to shift more red in the closer to the center something is.
+                let r = gameState.rng.boundedNext(0.2) + 0.9
+                let g = gameState.rng.boundedNext(0.4)
+                let b = gameState.rng.boundedNext(0.4)
+
+                let color = Color(r: r, g: g, b: b)
+
+                let exhaustParticle = Particle(
+                    position: position,
+                    velocity: exhaustVector,
+                    color: color,
+                    remainingTicks: gameState.rng.boundedNext(20)
+                )
+                gameState.particles.append(exhaustParticle)
+            }
 
             entity.velocity += V2.up.rotated(by: entity.direction) * 15 * f32(GetFrameTime())
         } else {
@@ -144,14 +139,13 @@ func update(_ entity: inout Entity, _ gameState: inout GameState) {
 
             entity.Player.weaponCooldown = 8
 
-            let facingVector = V2.up.rotated(by: entity.direction)
-            var bullet = Entity(
+            let bullet = Entity(
                 position: entity.position + (facingVector * 4),
                 velocity: facingVector * 100,
                 direction: entity.direction,
                 kind: .bullet(ticks: 0)
             )
-            gameState.add(&bullet)
+            gameState.entities.append(bullet)
         }
         if IsKeyDown(KeyR) {
             entity.position = .zero
@@ -161,17 +155,9 @@ func update(_ entity: inout Entity, _ gameState: inout GameState) {
             entity.Player.weaponCooldown -= 1
         }
 
-    case .exhaust:
-        if entity.ExhaustTicks > 10 {
-            gameState.remove(&entity)
-        } else {
-            entity.ExhaustTicks += 1
-            entity.velocity *= 0.98
-        }
-
     case .bullet:
         if entity.BulletTicks > 100 {
-            gameState.remove(&entity)
+            entity.flags.insert(.dead)
         } else {
             entity.BulletTicks += 1
         }
@@ -198,25 +184,7 @@ func draw(_ entity: Entity) {
 
         FillTri(t1, t2, t3, .white)
 
-    case .exhaust(let tick):
-        let tick = f32(tick)
-        let intensity = 1 / (tick + 1)
-        var t1 = V2(x: entity.position.x, y: entity.position.y - 3 + (intensity))
-        var t2 = V2(x: entity.position.x - 1.5 * sqrt(intensity), y: entity.position.y + (tick / 10))
-        var t3 = V2(x: entity.position.x + 1.5 * sqrt(intensity), y: entity.position.y + (tick / 10))
-
-        t1 = t1.rotated(by: entity.direction, around: entity.position)
-        t2 = t2.rotated(by: entity.direction, around: entity.position)
-        t3 = t3.rotated(by: entity.direction, around: entity.position)
-
-        let r = intensity
-        let g = (intensity * intensity) * (200 / 255)
-        let b = (intensity * intensity) * (225 / 255)
-        let color = Color(r: r, g: g, b: b)
-        FillTri(t1, t2, t3, color)
-
     case .bullet:
-//        DrawPoint(entity.position.x, entity.position.y, .white)
         FillCircle(entity.position, 0.5, .white)
 
     case .asteroid(_, let points):

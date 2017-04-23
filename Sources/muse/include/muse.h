@@ -942,7 +942,7 @@ static void BufferDefaultsCreate() {
     pixels         = BufferCreate(1, 1, GL_POINT,     2048,     false, false);
     lines          = BufferCreate(2, 2, GL_LINES,     4096,     false, false);
     connectedLines = BufferCreate(2, 2, GL_LINE_LOOP, 4096,     false, false);
-    triangles      = BufferCreate(3, 3, GL_TRIANGLES, 2048 * 3, false, false);
+    triangles      = BufferCreate(3, 3, GL_TRIANGLES, 10000 * 3, false, false);
     quads          = BufferCreate(4, 6, GL_TRIANGLES, 2048 * 4, true,  false);
     texturedQuads  = BufferCreate(4, 6, GL_TRIANGLES, 2048 * 4, true,  true);
 
@@ -1163,7 +1163,10 @@ static void setBuffer(RenderBuffer* buffer) {
 
 static void vertex(f32 x, f32 y) {
     if (currentRenderBuffer == NULL) Log(ERROR, "Attempt to draw vertex without an active buffer");
-    assert(currentRenderBuffer->count < currentRenderBuffer->max); // TODO(vdka): Render the buffer if it's full.
+    assert(currentRenderBuffer->count < currentRenderBuffer->max);
+    // TODO(vdka): Render the buffer if it's full.
+    // This is hard becaues we don't really know what state we are in here, we should do this on `setBuffer` if the
+    //  buffer is close to full.
 
     currentRenderBuffer->vertices[currentRenderBuffer->count] = (V2){x, y};
     currentRenderBuffer->colors[currentRenderBuffer->count] = currentColor;
