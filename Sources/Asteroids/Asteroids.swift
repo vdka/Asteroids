@@ -6,54 +6,6 @@ let sourceRoot = "/" + #file.characters.split(separator: "/").dropLast(3).map(St
 
 var pred = false
 
-func raycast(from rayStart: V2, to rayEnd: V2, _ seg1: V2, seg2: V2) -> V2 {
-
-    let rayDelta = V2(x: rayEnd.x - rayStart.x, y: rayEnd.y - rayStart.y)
-    let scale = V2(x: 1 / rayDelta.x, y: 1 / rayDelta.y)
-    var sign = V2()
-    sign.x = copysignf(1, scale.x)
-    sign.y = copysignf(1, scale.y)
-
-    var nearTime = V2()
-    nearTime.x = (seg1.x * sign.x - rayStart.x) * scale.x
-    nearTime.y = (seg1.y * sign.y - rayStart.y) * scale.y
-
-    var farTime = V2()
-    farTime.x = (seg2.x * sign.x - rayStart.x) * scale.x
-    farTime.y = (seg2.y * sign.y - rayStart.y) * scale.y
-
-    if nearTime.x > farTime.y || nearTime.y > farTime.x {
-        return rayEnd
-    }
-
-    let near = nearTime.x > nearTime.y ? nearTime.x : nearTime.y
-    let far  = farTime.x  > farTime.y  ? farTime.x  : farTime.y
-
-    if near >= 1 || far <= 0 {
-        // Collision does not lay upon the segment
-        return rayEnd
-    }
-
-    if pred {
-        print(rayDelta)
-        print(sign)
-        print("near time: ", terminator: "")
-        print(nearTime)
-        print("far  time: ", terminator: "")
-        print(farTime)
-        pred = false
-    }
-
-    var collision = V2()
-    collision.x = rayDelta.x * near
-    collision.y = rayDelta.y * near
-
-    collision.x += rayStart.x
-    collision.y += rayStart.y
-
-    return collision
-}
-
 func makeAsteroid(size: Int, rng: inout PCGRand32) -> Entity {
 
     var points: [V2] = []
@@ -61,25 +13,26 @@ func makeAsteroid(size: Int, rng: inout PCGRand32) -> Entity {
     let minRadius: f32 = 14
     let maxRadius: f32 = 20
 
-    let granularity: f32 = 0.1 * TAU
+    let nSides: f32 = rng.boundedNext(5) + 10
+    let granularity: f32 = TAU / nSides
 
-    let minVariation: f32 = 0.15 * TAU
+    let minVariation: f32 = granularity + 0.2 * TAU
     let maxVariation: f32 = 0.28 * TAU
 
     var angle: f32 = 0
-    while angle <= TAU - maxVariation {
+    while angle <= TAU {
 
-        let angleVariance = rng.boundedNext(maxVariation - minVariation) + minVariation
-        let angleFinal = angle + angleVariance
+        let angleVariance = rng.boundedNext(maxVariation - minVariation) + minVariation / 2
+        let angleFinal = min(angle + angleVariance, TAU)
 
-        let radius = rng.boundedNext(maxRadius - minRadius) + minRadius
+        let radius = rng.boundedNext(maxRadius - minRadius) + minRadius / 2
 
         let x = sin(angleFinal) * radius
         let y = -cos(angleFinal) * radius
 
         points.append(V2(x, y))
 
-        angle += TAU / granularity
+        angle += granularity
     }
 
     let minVelocity: f32 = 10
@@ -138,10 +91,21 @@ func update(_ memory: UnsafeMutablePointer<GameState>) {
         return
     }
 
-    if IsKeyDown(KeyN), gameState.rng.boundedNext(20) == 0 {
+    if IsKeyDown(KeyN), gameState.rng.boundedNext(1.0) < 0.1 {
         let asteroid = makeAsteroid(size: 1, rng: &gameState.rng)
 
         gameState.entities.append(asteroid)
+    }
+    if IsKeyDown(KeyR) {
+        var index = gameState.entities.startIndex
+        while index < gameState.entities.endIndex {
+
+            if case .asteroid = gameState.entities[index].kind {
+                gameState.entities.remove(at: index)
+            } else {
+                index = gameState.entities.index(after: index)
+            }
+        }
     }
 
     let mouse = WorldToCamera(GetMousePosition())
@@ -150,45 +114,38 @@ func update(_ memory: UnsafeMutablePointer<GameState>) {
         pred = true
     }
 
-    for (index, var entity) in gameState.entities.enumerated() {
-        update(&entity, &gameState)
-        gameState.entities[index] = entity
+    for index in gameState.entities.indices {
+        update(&gameState.entities[index], &gameState)
+    }
+    for index in gameState.particles.indices {
+        update(&gameState.particles[index], &gameState)
     }
 
-    for (index, var particle) in gameState.particles.enumerated() {
-        update(&particle, &gameState)
-        gameState.particles[index] = particle
-    }
+    gameState.entities.append(contentsOf: gameState.newEntities)
+    gameState.particles.append(contentsOf: gameState.newParticles)
+
+    gameState.newEntities.removeAll(keepingCapacity: true)
+    gameState.newParticles.removeAll(keepingCapacity: true)
 
     BeginFrame()
     ClearBackground(.black)
 
     FillCircle(mouse, 10, .red)
 
-    for entity in gameState.entities {
-        draw(entity)
-    }
-    for particle in gameState.particles {
-        draw(particle)
-    }
+    gameState.entities.forEach(draw)
+    gameState.particles.forEach(draw)
 
     EndFrame()
 
-    var nextEntities = Array<Entity>()
-    nextEntities.reserveCapacity(gameState.entities.count)
-    for entity in gameState.entities {
-        if !entity.flags.contains(.dead) {
-            nextEntities.append(entity)
+    for (index, entity) in gameState.entities.enumerated().reversed() {
+        if entity.flags.contains(.dead) {
+            gameState.entities.remove(at: index)
         }
     }
-    gameState.entities = nextEntities
 
-    var nextParticles = Array<Particle>()
-    nextParticles.reserveCapacity(gameState.particles.count)
-    for particle in gameState.particles {
-        if particle.remainingTicks > 0 {
-            nextParticles.append(particle)
+    for (index, particle) in gameState.particles.enumerated().reversed() {
+        if particle.remainingTicks <= 0 {
+            gameState.particles.remove(at: index)
         }
     }
-    gameState.particles = nextParticles
 }

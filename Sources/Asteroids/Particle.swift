@@ -28,15 +28,10 @@ func update(_ particle: inout Particle, _ gameState: inout GameState) {
         particle.remainingTicks -= 1
     }
 
-    let fps =
-
-    let decay = 1 - (0.9999 * f32(GetFrameTime()))
-    print(decay)
-    particle.velocity *= decay
+    particle.velocity *= 1 - (0.99 * 1 / 60)
 }
 
 func draw(_ particle: Particle) {
 
     FillCircle(particle.position, 0.3, particle.color)
 }
-

@@ -11,7 +11,7 @@ struct Entity {
     var kind: Kind
 
     enum Kind {
-        case player(weaponCooldown: Int, isAccelerating: Bool)
+        case player(timeToRespawn: Int, weaponCooldown: Int, isAccelerating: Bool)
         case bullet(ticks: Int)
 
         case asteroid(size: Int, points: [V2])
@@ -48,7 +48,7 @@ extension Entity.Kind {
 
 extension Entity {
 
-    var Player: (weaponCooldown: Int, isAccelerating: Bool) {
+    var Player: (timeToRespawn: Int, weaponCooldown: Int, isAccelerating: Bool) {
         get {
             guard case .player(let tuple) = kind else {
                 fatalError()
@@ -56,7 +56,7 @@ extension Entity {
             return tuple
         }
         set {
-            self.kind = .player(weaponCooldown: newValue.weaponCooldown, isAccelerating: newValue.isAccelerating)
+            self.kind = .player(timeToRespawn: newValue.timeToRespawn, weaponCooldown: newValue.weaponCooldown, isAccelerating: newValue.isAccelerating)
         }
     }
 
@@ -70,6 +70,14 @@ extension Entity {
         set {
             self.kind = .bullet(ticks: newValue)
         }
+    }
+
+    var isBullet: Bool {
+
+        guard case .bullet = kind else {
+            return false
+        }
+        return true
     }
 }
 
@@ -90,45 +98,74 @@ func update(_ entity: inout Entity, _ gameState: inout GameState) {
 
         let facingVector = V2.up.rotated(by: entity.direction)
 
+        if IsKeyDown(KeyR) {
+            entity.position = .zero
+        }
         if IsKeyDown(KeyD) {
 
             entity.direction -= 6 * f32(GetFrameTime())
+            entity.direction = wrap(entity.direction, lower: 0, upper: TAU)
         }
         if IsKeyDown(KeyA) {
 
             entity.direction += 6 * f32(GetFrameTime())
+            entity.direction = wrap(entity.direction, lower: 0, upper: TAU)
         }
         if IsKeyDown(KeyW) {
 
-            entity.Player.isAccelerating = true
+            func emitParticles(excess: Bool = false) {
+                let numberOfExhaustParticlesToEmit = gameState.rng.boundedNext(excess ? 100 : 30) as UInt32 + 3
 
-            let numberOfExhaustParticlesToEmit = 3
+                let exhaustTarget = (entity.position + (-facingVector * 15))
 
-            let rot = gameState.rng.boundedNext(0.1 * TAU) - (0.1 * TAU) / 2
-            let exhaustVector = (-facingVector.rotated(by: rot) * 100) * gameState.rng.normallyDistributedNext(center: 1.0, maxWidth: 0.2)
+                for _ in 0..<numberOfExhaustParticlesToEmit {
 
-            for _ in 0..<numberOfExhaustParticlesToEmit {
+                    let xOffset: Float = gameState.rng.boundedNext(shipAngle) - shipAngle / 2
+                    let position = (entity.position + (-facingVector * 3))
+                        .rotated(by: xOffset, around: entity.position)
 
-                let xOffset: Float = gameState.rng.boundedNext(shipAngle) - shipAngle / 2
-                let position = (entity.position + (-facingVector * 3)).rotated(by: xOffset, around: entity.position)
+                    let deviation: f32 = excess ? TAU * 0.075 : 0.025
+                    let exhaustVector = -(position - exhaustTarget)
+                        .normalized()
+                        .rotated(by: gameState.rng.boundedNext(deviation * TAU) - (deviation * TAU) / 2) * 30
 
-                // use this to shift more red in the closer to the center something is.
-                let r = gameState.rng.boundedNext(0.2) + 0.9
-                let g = gameState.rng.boundedNext(0.4)
-                let b = gameState.rng.boundedNext(0.4)
+                    // use this to shift more red in the closer to the center something is.
+                    let r = gameState.rng.boundedNext(0.2) + 0.9
+                    let g = gameState.rng.boundedNext(0.4)
+                    let b = gameState.rng.boundedNext(0.1)
 
-                let color = Color(r: r, g: g, b: b)
+                    let color = Color(r: r, g: g, b: b)
 
-                let exhaustParticle = Particle(
-                    position: position,
-                    velocity: exhaustVector,
-                    color: color,
-                    remainingTicks: gameState.rng.boundedNext(20)
-                )
-                gameState.particles.append(exhaustParticle)
+                    let exhaustParticle = Particle(
+                        position: position,
+                        velocity: exhaustVector * (excess ? 1.5 : 1),
+                        color: color,
+                        remainingTicks: gameState.rng.boundedNext(30)
+                    )
+                    gameState.newParticles.append(exhaustParticle)
+                }
+
+                // Odd math makes acceleration against inertia quicker to make the game feel more responsive.
+                let deltaDir = (V2.up.rotated(by: entity.direction) - entity.velocity.normalized()).length / 2
+                let deltaVel = V2.up.rotated(by: entity.direction) * (deltaDir + 0.2) * 50
+
+                if deltaDir > gameState.rng.boundedNext(0.4) + 0.8 && gameState.rng.boundedNext(1.0) < 0.25 {
+                    emitParticles(excess: true)
+                }
+
+                if !excess {
+                    entity.velocity += deltaVel * f32(GetFrameTime())
+                }
             }
 
-            entity.velocity += V2.up.rotated(by: entity.direction) * 15 * f32(GetFrameTime())
+            if entity.Player.isAccelerating, gameState.rng.boundedNext(1.0) < 0.99 {
+                emitParticles()
+            } else {
+                emitParticles(excess: true)
+            }
+            entity.Player.isAccelerating = true
+
+
         } else {
             entity.Player.isAccelerating = false
         }
@@ -137,18 +174,15 @@ func update(_ entity: inout Entity, _ gameState: inout GameState) {
         }
         if IsKeyDown(KeySpace), entity.Player.weaponCooldown == 0 {
 
-            entity.Player.weaponCooldown = 8
+            entity.Player.weaponCooldown = 12
 
             let bullet = Entity(
                 position: entity.position + (facingVector * 4),
-                velocity: facingVector * 100,
+                velocity: facingVector * 100 + entity.velocity,
                 direction: entity.direction,
                 kind: .bullet(ticks: 0)
             )
-            gameState.entities.append(bullet)
-        }
-        if IsKeyDown(KeyR) {
-            entity.position = .zero
+            gameState.newEntities.append(bullet)
         }
 
         if entity.Player.weaponCooldown > 0 {
@@ -162,12 +196,59 @@ func update(_ entity: inout Entity, _ gameState: inout GameState) {
             entity.BulletTicks += 1
         }
 
-    case .asteroid:
-        break
-        // collision detections.
-    }
+    case .asteroid(_, let points):
 
-    entity.direction = wrap(entity.direction, lower: 0, upper: TAU)
+        // TODO(vdka): Sim the movement and check the bullet end position instead
+        let closestBullet = gameState.entities.enumerated()
+            .filter({ $0.element.isBullet })
+            .sorted(by: { [entity] in (entity.position - $0.0.element.position).length < (entity.position - $0.1.element.position).length })
+            .first
+
+        let (bulletIndex, bullet) = (closestBullet?.offset, closestBullet?.element)
+
+        let player = gameState.entities[0]
+
+        var prevPoint = entity.position + points.last!
+        for point in points {
+            let point = entity.position + point
+
+            if let bullet = bullet, let bulletIndex = bulletIndex, intersect(prevPoint, point, bullet.position, bullet.position + bullet.velocity * f32(GetFrameTime())) != nil {
+                entity.flags.insert(.dead)
+
+                gameState.entities[bulletIndex].flags.insert(.dead)
+            } else if let collisionDirection = intersect(prevPoint, point, player.position, player.position + player.velocity * f32(GetFrameTime())) {
+
+                gameState.entities[0].flags.insert(.dead)
+
+                let numberOfParticlesToEmit = gameState.rng.boundedNext(400) as UInt32 + 200
+
+                let emitterDirection = -collisionDirection.normalized()
+
+                for _ in 0..<numberOfParticlesToEmit {
+
+                    let emissionVector = emitterDirection
+                        .rotated(by: gameState.rng.boundedNext(TAU * 0.75) - TAU / 2)
+
+                    // use this to shift more red in the closer to the center something is.
+                    let r = gameState.rng.boundedNext(0.2) + 0.9
+                    let g = gameState.rng.boundedNext(0.4)
+                    let b = gameState.rng.boundedNext(0.1)
+
+                    let color = Color(r: r, g: g, b: b)
+
+                    let particle = Particle(
+                        position: player.position,
+                        velocity: emissionVector * (gameState.rng.boundedNext(10) as Float + 20),
+                        color: color,
+                        remainingTicks: gameState.rng.boundedNext(50)
+                    )
+                    gameState.newParticles.append(particle)
+                }
+            }
+
+            prevPoint = point
+        }
+    }
 }
 
 func draw(_ entity: Entity) {

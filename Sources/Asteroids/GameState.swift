@@ -10,6 +10,9 @@ struct GameState {
 
     var entities: [Entity] = []
     var particles: [Particle] = []
+    
+    var newEntities: [Entity] = []
+    var newParticles: [Particle] = []
 
     init(camera: Camera) {
         self.currStateSize = MemoryLayout<GameState>.size

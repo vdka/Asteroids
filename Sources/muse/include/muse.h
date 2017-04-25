@@ -942,7 +942,7 @@ static void BufferDefaultsCreate() {
     pixels         = BufferCreate(1, 1, GL_POINT,     2048,     false, false);
     lines          = BufferCreate(2, 2, GL_LINES,     4096,     false, false);
     connectedLines = BufferCreate(2, 2, GL_LINE_LOOP, 4096,     false, false);
-    triangles      = BufferCreate(3, 3, GL_TRIANGLES, 10000 * 3, false, false);
+    triangles      = BufferCreate(3, 3, GL_TRIANGLES, 100000 * 3, false, false);
     quads          = BufferCreate(4, 6, GL_TRIANGLES, 2048 * 4, true,  false);
     texturedQuads  = BufferCreate(4, 6, GL_TRIANGLES, 2048 * 4, true,  true);
 
@@ -1158,6 +1158,9 @@ static void InitGraphicsDevice(i32 width, i32 height, const char* title) {
 
 // Bumps the call count on the buffer
 static void setBuffer(RenderBuffer* buffer) {
+    if ((buffer == NULL || buffer != currentRenderBuffer) && currentRenderBuffer != NULL && currentRenderBuffer->count + 25 >= currentRenderBuffer->max) {
+        BufferDraw(currentRenderBuffer);
+    }
     currentRenderBuffer = buffer;
 }
 
@@ -1610,7 +1613,7 @@ DEF void FillPoly(V2 center, i32 sides, f32 radius, Color color) {
             vertex(center.x, center.y);
         }
     }
-    setBuffer(&triangles);
+    setBuffer(NULL);
 }
 
 DEF void FillCircle(V2 center, f32 radius, Color color) {
