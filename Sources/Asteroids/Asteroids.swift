@@ -66,7 +66,7 @@ func setup() -> UnsafeMutablePointer<GameState> {
 
     SetCamera(camera)
 
-    let player = Entity(position: .zero, velocity: .zero, direction: 0, kind: .player(weaponCooldown: 0, isAccelerating: false))
+    let player = Entity(position: .zero, velocity: .zero, direction: 0, kind: .player(timeToRespawn: 0, weaponCooldown: 0, isAccelerating: false))
     gameState.entities.append(player)
 
     let memory = UnsafeMutablePointer<GameState>.allocate(capacity: 1)
